@@ -6,6 +6,12 @@ __pycache__/
 # C extensions
 *.so
 
+# Temp folders
+tutorial/tmp*
+
+# Sample data
+tutorial/data/*
+
 # Distribution / packaging
 .Python
 build/
