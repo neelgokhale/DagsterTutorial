@@ -5,7 +5,7 @@ import os
 import pandas as pd
 
 import requests
-from dagster import asset, AssetExecutionContext
+from dagster import asset, AssetExecutionContext, MaterializeResult, MetadataValue
 
 
 @asset
@@ -15,16 +15,15 @@ def topstory_ids() -> None:
     """
     NEWS_STORIES_URL = "https://hacker-news.firebaseio.com/v0/topstories.json"
     top_new_story_ids = requests.get(NEWS_STORIES_URL).json()[:100]
-
     os.makedirs("data", exist_ok=True)
     with open("data/topstory_ids.json", "w") as f:
         json.dump(top_new_story_ids, f)
 
 
 @asset(deps=[topstory_ids])
-def topstories(context: AssetExecutionContext) -> None:
+def topstories(context: AssetExecutionContext) -> MaterializeResult:
     """
-    Uses the topstory_ids json and retrieves information for each id and stores it in a pandas dataframe, then stores it into a csv
+    Uses the topstory_ids json and retrieves information for each id and stores it in a pandas dataframe, then stores it into a csv. Returns a MaterializeResult object to capture metadata pretaining to the run
     """
     with open("data/topstory_ids.json", "r") as f:
         topstory_ids = json.load(f)
@@ -42,6 +41,13 @@ def topstories(context: AssetExecutionContext) -> None:
     df = pd.DataFrame(results)
     df.to_csv("data/topstories.csv")
 
+    # return metadata
+    return MaterializeResult(
+        metadata={
+            "num_records": df.shape[0],
+            "preview": MetadataValue.md(df.head().to_markdown())
+        }
+    )
 
 @asset(deps=[topstories])
 def most_frequent_words() -> None:
