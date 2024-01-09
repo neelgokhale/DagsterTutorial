@@ -1,8 +1,12 @@
 
 import json
 import os
+import base64
+
+from io import BytesIO
 
 import pandas as pd
+import matplotlib.pyplot as plt
 
 import requests
 from dagster import asset, AssetExecutionContext, MaterializeResult, MetadataValue
@@ -50,7 +54,7 @@ def topstories(context: AssetExecutionContext) -> MaterializeResult:
     )
 
 @asset(deps=[topstories])
-def most_frequent_words() -> None:
+def most_frequent_words() -> MaterializeResult:
     """
     Retrieve a list of the top-25 most frequent words in the titles of news articles and store them in json
     """
@@ -70,5 +74,24 @@ def most_frequent_words() -> None:
         for pair in sorted(word_counts.items(), key=lambda x: x[1], reverse=True)[:25]
     }
 
+    # bar chart of top 25 words
+    fig, ax = plt.subplots(figsize=(10, 6))
+    ax.bar(list(top_words.keys()), list(top_words.values()))
+    ax.set_xticks(range(len(top_words)), list(top_words.keys()), rotation=45, ha='right')
+    ax.set_title("Top 25 Words in Hacker News Titles")
+    fig.tight_layout()
+
+    # convert image into savable format
+    buffer = BytesIO()
+    fig.savefig(buffer, format="png")
+    image_data = base64.b64encode(buffer.getvalue())
+
+    # convert image to markdown
+    md_content = f"![img](data:image/png;base64,{image_data.decode()})"
+
     with open("data/most_frequent_words.json", "w") as f:
         json.dump(top_words, f)
+
+    return MaterializeResult(
+        metadata={"plot": MetadataValue.md(md_content)}
+    )
